@@ -443,7 +443,7 @@ class Observation:
 
         self.ra = Angle(ra, deg=True)
         self.dec = Angle(dec, deg=True)
-        self.jd = jd
+        self.jd = jd/365.25
         self.mag = mag
 
 def jd2Angle(jd):
