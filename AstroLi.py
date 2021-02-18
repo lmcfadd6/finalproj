@@ -438,6 +438,14 @@ class KeplerOrbit:
 
         return r, v
 
+class Observation:
+    def __init__(self, ra, dec, jd, mag):
+
+        self.ra = Angle(ra, deg=True)
+        self.dec = Angle(dec, deg=True)
+        self.jd = jd
+        self.mag = mag
+
 def jd2Angle(jd):
 
     """ Converts julian date to the angle between greenwich and the First Point of Aries
