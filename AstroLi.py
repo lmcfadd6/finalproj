@@ -19,6 +19,11 @@ class Constants:
         # Solar mass in kg
         self.M_sun = 1.989e30 #kg
 
+        # Earth mass in kg
+        self.M_earth = 3.0404327497692654e-06*self.M_sun #kg
+
+
+
 class Vector3D:
     """ Basic function defining 3D cartesian vectors in [x, y, z] form
 
@@ -72,7 +77,11 @@ class Vector3D:
         return result
 
     def __str__(self):
-        return '[ {:.4f}, {:.4f}, {:.4f}]'.format(self.x, self.y, self.z)
+        mag = self.mag()
+        if mag == 1.0:
+            return 'Unit Vector: [ {:.4f}, {:.4f}, {:.4f}]'.format(self.x, self.y, self.z)
+        else:
+            return 'Vector: [ {:.4f}, {:.4f}, {:.4f}]'.format(self.x, self.y, self.z)
 
     def mag(self):
         """ Returns the geometric magnitude of the vector
@@ -100,6 +109,17 @@ class Vector3D:
         x = self.y*other.z - self.z*other.y
         y = self.z*other.x - self.x*other.z
         z = self.x*other.y - self.y*other.x
+
+        result = Vector3D(x, y, z)
+        return result
+
+    def unitVec(self):
+
+        mag = self.mag()
+
+        x = self.x*(1/mag)
+        y = self.y*(1/mag)
+        z = self.z*(1/mag)
 
         result = Vector3D(x, y, z)
         return result
@@ -360,7 +380,7 @@ class KeplerOrbit:
 
         # Helper variables
         n = np.sqrt(mu/a**3)
-        E = ef2E(e, f.rad)
+        E = self.ef2E(f.rad)
 
         # Position Components
         x = a*(np.cos(E.rad) - e)
@@ -417,3 +437,31 @@ class KeplerOrbit:
         v = self.rotateOrbitAngles(v)
 
         return r, v
+
+def jd2Angle(jd):
+
+    """ Converts julian date to the angle between greenwich and the First Point of Aries
+    input:
+    jd [float] - Julian Date
+    returns:
+    theta [Angle Object] - angle between greenwich and the First Point of Aries
+    """
+
+    # Constants
+    JUL_DAYS_BEFORE_JAN_1_2000 = 2451545.0
+    DAYS_PER_YEAR = 365.25
+    YEARS_PER_CENTURY = 100
+    T2ANG_COEFFS = [280.46061837, 360.98564736629, 0.0003879332, 38710000]
+
+    try:
+        jd = float(jd)
+    except ValueError:
+        print("[WARNING] Julian Date is not a float")
+        return None
+
+    t = jd - JUL_DAYS_BEFORE_JAN_1_2000
+    t_cent = t/DAYS_PER_YEAR/YEARS_PER_CENTURY
+    theta = T2ANG_COEFFS[0] + T2ANG_COEFFS[1]*t + T2ANG_COEFFS[2]*t_cent**2 - t_cent**3/T2ANG_COEFFS[3]
+    theta = Angle(theta, deg=True)
+
+    return theta
