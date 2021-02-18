@@ -76,6 +76,10 @@ class Vector3D:
                           self.z * other)
         return result
 
+    def __neg__(self):
+
+        return Vector3D(-self.x, -self.y, -self.z)
+
     def __str__(self):
         mag = self.mag()
         if mag == 1.0:
@@ -111,6 +115,7 @@ class Vector3D:
         z = self.x*other.y - self.y*other.x
 
         result = Vector3D(x, y, z)
+
         return result
 
     def unitVec(self):
@@ -123,6 +128,33 @@ class Vector3D:
 
         result = Vector3D(x, y, z)
         return result
+
+    def rotate(self, ang, axis):
+        """ Rotates vector <ang> degrees around an axis
+            inputs:
+            ang [Angle Obj] - angle to rotate coordinate system by
+            axis ["x", "y", or "z"] - axis to rotate vector around 
+        """
+        
+        if axis == "x":
+            M = np.array([[1,          0,               0     ], \
+                          [0, np.cos(ang.rad), np.sin(ang.rad)], \
+                          [0, -np.sin(ang.rad), np.cos(ang.rad)]])
+        elif axis == "y":
+            M = np.array([[np.cos(ang.rad), 0, -np.sin(ang.rad)], \
+                          [0, 1, 0], \
+                          [np.sin(ang.rad), 0, np.cos(ang.rad)]])
+        elif axis == "z":
+            M = np.array([[np.cos(ang.rad), np.sin(ang.rad), 0], \
+                          [-np.sin(ang.rad), np.cos(ang.rad), 0], \
+                          [0, 0, 1]])
+        else:
+            print("Unrecognized Axis")
+            return None
+
+        vect = np.inner(M, self.xyz)
+
+        return Vector3D(vect[0], vect[1], vect[2])
 
 class Angle:
     """
@@ -250,6 +282,10 @@ class Cart:
     def __str__(self):
 
         return "Cart Obj: x={:.2f} y={:.2f} z={:.2f}".format(self.x, self.y, self.z)
+
+    def __neg__(self):
+
+        return Cart(-self.x, -self.y, -self.z)
 
     def rotate(self, ang, axis):
         """ Rotates vector <ang> degrees around an axis
@@ -397,7 +433,7 @@ class KeplerOrbit:
 
         return r, v
 
-    def rotateOrbitAngles(self, vector):
+    def rotateOrbitAngles(self, vector, back=False):
         """ Rotates a vector to a heliocentric ecliptic plane
 
         Inputs:
@@ -412,13 +448,18 @@ class KeplerOrbit:
 
         # Negative Rotation because of rotation matricies
         # Rotation as given in the notes
-        vector = vector.rotate(-self.w, "z")
-        vector = vector.rotate(-self.i, "x")
-        vector = vector.rotate(-self.O, "z")
+        if not back:
+            vector = vector.rotate(-self.w, "z")
+            vector = vector.rotate(-self.i, "x")
+            vector = vector.rotate(-self.O, "z")
+        else:
+            vector = vector.rotate(self.w, "z")
+            vector = vector.rotate(self.i, "x")
+            vector = vector.rotate(self.O, "z")
 
         return vector
 
-    def orbit2HeliocentricState(self, mu, f):
+    def orbit2HeliocentricState(self, mu, f, no_rotate=False):
         """ Rotate state vectors of position and velocity to heliocentric ecliptic plane
 
         Inputs:
@@ -433,8 +474,9 @@ class KeplerOrbit:
 
         r, v = self.orbit2State(f, mu)
 
-        r = self.rotateOrbitAngles(r)
-        v = self.rotateOrbitAngles(v)
+        if not no_rotate:
+            r = self.rotateOrbitAngles(r)
+            v = self.rotateOrbitAngles(v)
 
         return r, v
 

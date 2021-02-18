@@ -3,12 +3,9 @@ from AstroLi import *
 def radec2UnitVec(ra, dec):
     # takes obs ra and dec, and returns geocentric unit vectors
 
-    z = 1
-
-    h = z/np.tan(dec.rad)
-
-    x = h/np.sqrt(1 + np.tan(ra.rad)**2) 
-    y = np.sqrt(h**2 - x**2)
+    z = np.sin(dec.rad)
+    y = np.cos(dec.rad)*np.sin(ra.rad)
+    x = np.cos(dec.rad)*np.cos(ra.rad)
 
     r = Vector3D(x, y, z)
     r = r.unitVec()
@@ -26,22 +23,25 @@ def cunninghamFrame(p1, p2, p3):
 
     return xi.unitVec(), eta.unitVec(), zeta.unitVec()
 
-
-
 def cunninghamTransform(p1, p2, p3, xi, eta, zeta, backward=False):
 
-    M = np.array([[p1.dot(xi), p1.dot(eta), p1.dot(zeta)], \
-                  [p2.dot(xi), p2.dot(eta), p2.dot(zeta)], \
-                  [p3.dot(xi), p3.dot(eta), p3.dot(zeta)]])
+    x = Vector3D(1, 0, 0)
+    y = Vector3D(0, 1, 0)
+    z = Vector3D(0, 0, 1)
+
+    M = np.array([[x.dot(xi), y.dot(xi), z.dot(xi)], \
+                  [x.dot(eta), y.dot(eta), z.dot(eta)], \
+                  [x.dot(zeta), y.dot(zeta), z.dot(zeta)]])
+
 
     if backward:
-        rho1 = Vector3D(*np.inner(M.T, p1.xyz))
-        rho2 = Vector3D(*np.inner(M.T, p2.xyz))
-        rho3 = Vector3D(*np.inner(M.T, p3.xyz))
+        rho1 = Vector3D(*np.inner(np.transpose(M), (p1).xyz))
+        rho2 = Vector3D(*np.inner(np.transpose(M), (p2).xyz))
+        rho3 = Vector3D(*np.inner(np.transpose(M), (p3).xyz))
     else:
-        rho1 = Vector3D(*np.inner(M, p1.xyz))
-        rho2 = Vector3D(*np.inner(M, p2.xyz))
-        rho3 = Vector3D(*np.inner(M, p3.xyz))
+        rho1 = Vector3D(*np.inner(M, (p1).xyz))
+        rho2 = Vector3D(*np.inner(M, (p2).xyz))
+        rho3 = Vector3D(*np.inner(M, (p3).xyz))
 
     return rho1, rho2, rho3
 
@@ -60,8 +60,8 @@ def jd2M(jd, mu, k_orbit):
 
 def M2E(M, k_orbit):
 
-    tol = 1e-4
-    buf = 1
+    tol = 1e-10
+    buf = 4
     N = 100
 
     E = np.linspace(0, 2*np.pi, N)
@@ -92,15 +92,13 @@ def M2E(M, k_orbit):
     return E
 
 def jd2f(jd, mu, k_orbit):
-    print("JD", jd)
+
     M = jd2M(jd, mu, k_orbit)
 
     E = M2E(M, k_orbit)
-    print("M", M)
-    print("E", E)
 
     f = k_orbit.eE2f(E)
-    print("f", f)
+
     return f
 
 def myfunctionF(mu, r_0, t, t_0):
@@ -117,8 +115,8 @@ def r2V(O1, O2, O3, R1, R2, R3, mu):
     g = myfunctionG(mu, R2, O3.jd, O2.jd)
     v_1 = (R3 - R2*f)*(1/g)
 
-    f = myfunctionF(mu, R3, O3.jd, O1.jd)
-    g = myfunctionG(mu, R3, O3.jd, O1.jd)
+    f = myfunctionF(mu, R3, O1.jd, O3.jd)
+    g = myfunctionG(mu, R3, O1.jd, O3.jd)
     v_2 = (R1 - R3*f)*(1/g)
 
     f = myfunctionF(mu, R1, O2.jd, O1.jd)
@@ -154,9 +152,9 @@ def orbitalElements(mu, r, v):
         print("[ERROR] r can not be a zero vector!")
         return None, None, None, None, None, None
     
-    if 2/r.mag() <= v.mag()**2/mu:
-        print("[ERROR] Orbit is no longer elliptical")
-        return None, None, None, None, None, None
+    # if 2/r.mag() <= v.mag()**2/mu:
+    #     print("[ERROR] Orbit is no longer elliptical")
+    #     return None, None, None, None, None, None
         
     # angular momentum per unit mass
     h = r.cross(v)
@@ -226,42 +224,74 @@ def findOrbit(O1, O2, O3):
 
     mu = c.G*(1 + c.M_earth/c.M_sun)
 
+    OBL = Angle(23.439291111111, deg=True)
 
     f = jd2f(O1.jd, mu, Earth)
     R1, _ = Earth.orbit2HeliocentricState(mu, f.rad)
-    R1 = Vector3D(*R1.xyz)
+    R1 = -Vector3D(*R1.xyz)
+    R1 = R1.rotate(-OBL, "x")
 
     f = jd2f(O2.jd, mu, Earth)
     R2, _ = Earth.orbit2HeliocentricState(mu, f.rad)
-    R2 = Vector3D(*R2.xyz)
+    R2 = -Vector3D(*R2.xyz)
+    R2 = R2.rotate(-OBL, "x")
 
     f = jd2f(O3.jd, mu, Earth)
     R3, _ = Earth.orbit2HeliocentricState(mu, f.rad)
-    R3 = Vector3D(*R3.xyz)
+    R3 = -Vector3D(*R3.xyz)
+    R3 = R3.rotate(-OBL, "x")
+
+    print("Earth-Sun")
+    print(R1, R2, R3)
 
     R1, R2, R3 = cunninghamTransform(R1, R2, R3, xi, eta, zeta)
+
+    print("Cunningham Earth-Sun")
+    print(R1, R2, R3)
 
     a1 = (O3.jd - O2.jd)/(O3.jd - O1.jd)
     a3 = (O2.jd - O1.jd)/(O3.jd - O1.jd)
 
     pp2 = (-a1*R1.z + R2.z - a3*R3.z)/rho2.z
     pp3 = (pp2*rho2.y + a1*R1.y - R2.y + a3*R3.y)/a3/rho3.y
-    pp1 = (pp2*rho2.x - a3*pp3*rho3.x + a1*R1.x - R2.x +a3*R3.x)/a3
+    pp1 = (pp2*rho2.x - a3*pp3*rho3.x + a1*R1.x - R2.x + a3*R3.x)/a1
+
+    print('distances')
+    print(pp1, pp2, pp3)
 
     # Geocentric Vectors
     p1 = rho1*pp1
     p2 = rho2*pp2
     p3 = rho3*pp3
 
+    print("Geocentric")
+    print(p1, p2, p3)
+
+    p1, p2, p3 = cunninghamTransform(p1, p2, p3, xi, eta, zeta, backward=True)
+    R1, R2, R3 = cunninghamTransform(R1, R2, R3, xi, eta, zeta, backward=True)
+
     # Heliocentric Vectors
-    S1 = p1 + R1
-    S2 = p2 + R2
-    S3 = p3 + R3
+    S1 = p1 - R1
+    S2 = p2 - R2
+    S3 = p3 - R3
 
+    print("Heliocentric")
+    print(S1, S2, S3)
 
-    S1, S2, S3 = cunninghamTransform(S1, S2, S3, xi, eta, zeta, backward=True)
+    S1 = S1.rotate(OBL, "x")
+    S2 = S2.rotate(OBL, "x")
+    S3 = S3.rotate(OBL, "x")
+    # S1, S2, S3 = cunninghamTransform(S1, S2, S3, xi, eta, zeta, backward=True)
+
+    print("Heliocentric Regular Frame")
+    print(S1, S2, S3)
 
     v_1, v_2, v_3 = r2V(O1, O2, O3, S1, S2, S3, mu)
+
+    
+
+    print("Speeds")
+    print(v_3, v_2, v_1)
 
     print("########## Orbit 1")
     orbitalElements(mu, S1, v_1)
@@ -276,9 +306,6 @@ def findOrbit(O1, O2, O3):
 
 if __name__ == "__main__":
 
-
-    # Switch observation 3 and 4 because sneaky observer made 
-    # jd of 1 and 3 the same so that a1 and a3 are divided by 0
     # RA, Dec, jd, Mag
     O1 = Observation(76.7504965149237393, 51.8102647002936152, 2452465.5000000000000000, 24.658)
     O2 = Observation(76.9265709928143906, 51.8507984607866774, 2452470.5000000000000000, 24.651)
@@ -290,6 +317,6 @@ if __name__ == "__main__":
     C2 = Observation(205.9849498113317452, -13.6110792357453203, 2452470.5, 24.603)
     C3 = Observation(207.8799269709847692, -14.4906759088960460, 2452480.5, 24.547)
 
-    findOrbit(C1, C2, C3)
+    findOrbit(O1, O2, O3)
 
  
