@@ -8,7 +8,7 @@ class Constants:
     def __init__(self):
 
         # Gravitational Constant
-        self.G = 39.478 #AU^3 yr^-2 M_sun^-1
+        self.G = 4*np.pi**2 #AU^3 yr^-2 M_sun^-1
 
         # Astronomical Unit in meters
         self.AU = 1.496e+11 # m
@@ -21,6 +21,8 @@ class Constants:
 
         # Earth mass in kg
         self.M_earth = 3.0404327497692654e-06*self.M_sun #kg
+
+        self.days_per_year = 365.2568983263281
 
 
 
@@ -40,6 +42,11 @@ class Vector3D:
         self.y = y
         self.z = z
         self.xyz = [x, y, z]
+        self.h = (x*x + y*y)**0.5
+        self.r = (x*x + y*y + z*z)**0.5
+
+        self.phi =   Angle(np.arctan2(self.y, self.x))
+        self.theta = Angle(np.arctan2(self.h, self.z))
 
     def __add__(self, other):
         """ Adds two vectors as expected
@@ -287,6 +294,10 @@ class Cart:
 
         return Cart(-self.x, -self.y, -self.z)
 
+    def __sub__(self, other):
+
+        return Cart(self.x - other.x, self.y - other.y, self.z - other.z)
+
     def rotate(self, ang, axis):
         """ Rotates vector <ang> degrees around an axis
             inputs:
@@ -347,6 +358,18 @@ class KeplerOrbit:
         # If w is not given, calculate through w_tilde = O + w
         if self.w.isNone() and not(self.O.isNone() or self.w_tilde.isNone()):
             self.w = self.w_tilde - self.O
+
+
+    def __str__(self):
+
+        A = "ORBIT OBJECT: \n"
+        A += "[a] = {:.4f} AU \n".format(self.a)
+        A += "[e] = {:.4f} \n".format(self.e)
+        A += "[i] = {:.4f}° \n".format((self.i.deg)%360)
+        A += "[\u03A9] = {:.2f}° \n".format((self.O.deg)%360)
+        A += "[\u03C9] = {:.4f}°".format((self.w.deg)%360)
+
+        return A
 
 
     def ef2E(self, f, debug=False):
@@ -459,7 +482,7 @@ class KeplerOrbit:
 
         return vector
 
-    def orbit2HeliocentricState(self, mu, f, no_rotate=False):
+    def orbit2HeliocentricState(self, mu, f, no_rotate=False, back=False):
         """ Rotate state vectors of position and velocity to heliocentric ecliptic plane
 
         Inputs:
@@ -475,8 +498,8 @@ class KeplerOrbit:
         r, v = self.orbit2State(f, mu)
 
         if not no_rotate:
-            r = self.rotateOrbitAngles(r)
-            v = self.rotateOrbitAngles(v)
+            r = self.rotateOrbitAngles(r, back=back)
+            v = self.rotateOrbitAngles(v, back=back)
 
         return r, v
 
@@ -485,33 +508,38 @@ class Observation:
 
         self.ra = Angle(ra, deg=True)
         self.dec = Angle(dec, deg=True)
-        self.jd = jd/365.25
+        self.jd = jd
         self.mag = mag
 
-def jd2Angle(jd):
+    def __str__(self):
 
-    """ Converts julian date to the angle between greenwich and the First Point of Aries
-    input:
-    jd [float] - Julian Date
-    returns:
-    theta [Angle Object] - angle between greenwich and the First Point of Aries
+        A = "Observation Object \n"
+        A +="----------------------- \n"
+        A += "RA {:} \n".format(self.ra)
+        A += "DEC {:} \n".format(self.dec)
+        A += "JD {:} \n".format(self.jd)
+        A += "MAG {:} \n".format(self.mag)
+
+        return A
+
+
+def cart2Radec(cart):
+
     """
+    Extension to Cart object to correctly convert theta and phi to Right Ascension and Declination
+    inputs:
+    cart [Cart Object] - cart object to convert
+    returns:
+    ra [Right Ascension Obj] - Right ascension of cart
+    dec [float] - Declination of cart
+    """
+    if not hasattr(cart, "theta") or not hasattr(cart, "phi"):
+        print("[WARNING] Cartesian object does not have angles!")
+        return None, None
 
-    # Constants
-    JUL_DAYS_BEFORE_JAN_1_2000 = 2451545.0
-    DAYS_PER_YEAR = 365.25
-    YEARS_PER_CENTURY = 100
-    T2ANG_COEFFS = [280.46061837, 360.98564736629, 0.0003879332, 38710000]
+    dec = 90 - cart.theta.deg
+    ra  = cart.phi.deg
 
-    try:
-        jd = float(jd)
-    except ValueError:
-        print("[WARNING] Julian Date is not a float")
-        return None
+    # ra = RightAsc(ra)
 
-    t = jd - JUL_DAYS_BEFORE_JAN_1_2000
-    t_cent = t/DAYS_PER_YEAR/YEARS_PER_CENTURY
-    theta = T2ANG_COEFFS[0] + T2ANG_COEFFS[1]*t + T2ANG_COEFFS[2]*t_cent**2 - t_cent**3/T2ANG_COEFFS[3]
-    theta = Angle(theta, deg=True)
-
-    return theta
+    return ra, dec
