@@ -22,7 +22,8 @@ class Constants:
         # Earth mass in kg
         self.M_earth = 3.0404327497692654e-06*self.M_sun #kg
 
-        self.days_per_year = 365.2568983263281
+        # Days per year
+        self.days_per_year = 365.2568983263281 #days
 
 
 
@@ -504,6 +505,17 @@ class KeplerOrbit:
         return r, v
 
 class Observation:
+    ''' An observation object with right ascension, declination, jd, and magnitude
+    other parameters such as orbit may be added to this object ad hoc from calculations
+    for storage
+
+    Inputs:
+    ra [float] - Right Ascension of object in degrees
+    dec [float] - Declination of object in degrees
+    jd [float] - Julian day of observation in days
+    mag [float] - Magnitude of observation
+    '''
+
     def __init__(self, ra, dec, jd, mag):
 
         self.ra = Angle(ra, deg=True)
@@ -539,7 +551,5 @@ def cart2Radec(cart):
 
     dec = 90 - cart.theta.deg
     ra  = cart.phi.deg
-
-    # ra = RightAsc(ra)
 
     return ra, dec

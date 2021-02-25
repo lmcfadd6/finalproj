@@ -1,3 +1,5 @@
+##### Imports
+
 import numpy as np
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as p3
@@ -5,12 +7,20 @@ import matplotlib.animation as animation
 
 from AstroLi import *
 
+##### Constants
 c = Constants()
-
 Earth = KeplerOrbit(1.00000011, 0.01671022, 0.00005, O=-11.26064, w_tilde=102.94719)
 
 def radec2UnitVec(ra, dec):
-    # takes obs ra and dec, and returns geocentric unit vectors
+
+    ''' takes observevd ra and dec, and returns geocentric unit vectors
+    Inputs:
+    ra [Angle Obj] - Right Ascension of object
+    dec [Angle Obj] - Declination of object
+
+    Retruns:
+    r [Vector3D] - Unit vector of object direction
+    '''
 
     z = np.sin(dec.rad)
     y = np.cos(dec.rad)*np.sin(ra.rad)
@@ -33,6 +43,15 @@ def cunninghamFrame(p1, p2, p3):
     return xi.unitVec(), eta.unitVec(), zeta.unitVec()
 
 def cunninghamTransform(p1, p2, p3, xi, eta, zeta, backward=False):
+    ''' Transforms a set of vectors into the cunningham frame
+
+    Inputs:
+    p1, p2, p3 [Vector Objs] - Three vectors to transform
+    xi, eta, zeta [Vector Objs] - Three unit vectors defining the cunningham frame
+
+    Outputs:
+    rho1, rho2, rho3 [Vector Objs] - p1, p2, p3 rotated into the cunningham frame
+    '''
 
     x = Vector3D(1, 0, 0)
     y = Vector3D(0, 1, 0)
@@ -56,6 +75,16 @@ def cunninghamTransform(p1, p2, p3, xi, eta, zeta, backward=False):
 
 
 def jd2M(jd, mu, k_orbit):
+    ''' Converts a julian day into mean anomaly
+
+    Inputs:
+    jd [float] - julian day
+    mu [float] - standard gravitational parameter
+    k_orbit [KeplerOrbit Obj] - Orbit of object to convert
+
+    Outputs:
+    M [float] - Mean anomaly at given jd in radians
+    '''
     
     L = np.radians(100.46435)
     jd_2000 = 2451545.0
@@ -68,6 +97,15 @@ def jd2M(jd, mu, k_orbit):
     return M
 
 def M2E(M, k_orbit):
+    ''' Converts a mean anomaly into eccentric anomaly
+
+    Inputs:
+    M [float] - Mean anomaly in radians
+    k_orbit [KeplerOrbit Obj] - Orbit of object to convert
+
+    Outputs:
+    E [float] - Eccentric anomaly in radians
+    '''
 
     tol = 1e-10
     buf = 4
@@ -101,6 +139,17 @@ def M2E(M, k_orbit):
     return E
 
 def jd2f(jd, mu, k_orbit, verbose=False):
+    ''' Converts a julian date to true anomaly in 3 steps
+    see helper functions for more detail
+
+    Inputs: 
+    jd [float] - julian day
+    mu [float] - standard parameter
+    k_orbit [KeplerOrbit Obj] - Orbit of object to convert
+
+    Outputs:
+    f [Angle Obj] - true anomaly
+    '''
 
     M = jd2M(jd, mu, k_orbit)
 
@@ -114,18 +163,49 @@ def jd2f(jd, mu, k_orbit, verbose=False):
     return f
 
 def myfunctionF(mu, r_0, t, t_0):
+    ''' f in equations to estimate velocity from position vectors
+
+    Inputs:
+    mu [float] - standard gravitational parameter
+    r_0 [Vector3D Obj] - initial position vector of object
+    t [float] - final julian day of object
+    t_0 [float] - initial julian day of object
+
+    Outputs:
+    f(t, t_0) [float] 
+    '''
 
     sigma = mu/(r_0.mag())**3
     
     return 1 - 0.5*sigma*((t - t_0)/c.days_per_year)**2
 
 def myfunctionG(mu, r_0, t, t_0):
+    ''' g in equations to estimate velocity from position vectors
+
+    Inputs:
+    mu [float] - standard gravitational parameter
+    r_0 [Vector3D Obj] - initial position vector of object
+    t [float] - final julian day of object
+    t_0 [float] - initial julian day of object
+
+    Outputs:
+    g(t, t_0) [float] 
+    '''    
 
     sigma = mu/(r_0.mag())**3
 
     return ((t - t_0)/c.days_per_year) - 1/6*sigma*((t - t_0)/c.days_per_year)**3
 
 def r2V(O1, O2, O3, R1, R2, R3, mu):
+    ''' Estimates velocity vectors from position vectors for three observations
+
+    Inputs:
+    O1, O2, O3 [Observation Objs] - Observations to predict velocities of
+    R1, R2, R3 [Vector3D Objs] - Position vectors of the three observations
+
+    Outputs:
+    v_1, v_2, v_3 [Vector3D Obj] - Three velocity vector estimates of object
+    '''
 
     f = myfunctionF(mu, R2, O3.jd, O2.jd)
     g = myfunctionG(mu, R2, O3.jd, O2.jd)
@@ -221,7 +301,19 @@ def orbitalElements(mu, r, v):
     return a, e, i, o, f, w
 
 def findOrbit(O1, O2, O3, factor=1):
+    ''' Predict orbit of an object given 3 observation objects
 
+    Inputs:
+    O1, O2, O3 [Observation Objs] - Observations to predict from
+    factor [float] - Optional fudge factor, multiplies sector ratios by this number, useful 
+    for seeing how variable solutions are
+
+    Returns:
+    O1, O2, O3 [Observation Obj] - Observations with orbits included (call O1.orbit for orbit)
+    O1.orbit.e, O2.orbit.e, O3.orbit.e [float] - Eccentricities of orbit (useful for bugfixing unbound orbits)
+    '''
+
+    # Unit vectors of observatins
     p1 = radec2UnitVec(O1.ra, O1.dec)
     p2 = radec2UnitVec(O2.ra, O2.dec)
     p3 = radec2UnitVec(O3.ra, O3.dec)
@@ -232,6 +324,7 @@ def findOrbit(O1, O2, O3, factor=1):
     print(p2)
     print(p3)
 
+    # Cunningham frame
     xi, eta, zeta = cunninghamFrame(p1, p2, p3)
 
     print("")
@@ -241,8 +334,10 @@ def findOrbit(O1, O2, O3, factor=1):
     print(eta)
     print(zeta)
 
+    # Rotate to cunningham frame
     rho1, rho2, rho3 = cunninghamTransform(p1, p2, p3, xi, eta, zeta)
 
+    # Make sure these are unit vectors
     rho1 = rho1.unitVec()
     rho2 = rho2.unitVec()
     rho3 = rho3.unitVec()
@@ -254,12 +349,11 @@ def findOrbit(O1, O2, O3, factor=1):
     print(rho2)
     print(rho3)
 
-    Earth = KeplerOrbit(1.00000011, 0.01671022, 0.00005, O=-11.26064, w_tilde=102.94719)
-
     mu = c.G*(1 + c.M_earth/c.M_sun)
 
     OBL = Angle(23.439291111111, deg=True)
 
+    # Find Earth-Sun vector at given observation time
     f = jd2f(O1.jd, mu, Earth)
     R1, _ = Earth.orbit2HeliocentricState(mu, f.rad)
     R1 = Vector3D(*R1.xyz)
@@ -282,6 +376,7 @@ def findOrbit(O1, O2, O3, factor=1):
     print(R2)
     print(R3)
 
+    # Transform to cunningham
     R1, R2, R3 = cunninghamTransform(R1, R2, R3, xi, eta, zeta)
 
     print("")
@@ -291,6 +386,7 @@ def findOrbit(O1, O2, O3, factor=1):
     print(R2)
     print(R3)
 
+    # Sector ratios
     a1 = (O3.jd - O2.jd)/(O3.jd - O1.jd)*factor
     a3 = (O2.jd - O1.jd)/(O3.jd - O1.jd)*factor
 
@@ -304,7 +400,7 @@ def findOrbit(O1, O2, O3, factor=1):
         message = "(close to zero)"
     print("\u03BD_2 = {:.6E} {:}".format(rho2.z, message))
 
-
+    # Magnitudes of observation vectors
     pp2 = (-a1*R1.z + R2.z - a3*R3.z)/rho2.z
     pp3 = (pp2*rho2.y + a1*R1.y - R2.y + a3*R3.y)/a3/rho3.y
     pp1 = (pp2*rho2.x - a3*pp3*rho3.x + a1*R1.x - R2.x + a3*R3.x)/a1
@@ -333,6 +429,7 @@ def findOrbit(O1, O2, O3, factor=1):
     S2 = S2.rotate(OBL, "x")
     S3 = S3.rotate(OBL, "x")
 
+    # Store these vectors in observation objects
     O1.geoVect = p1
     O2.geoVect = p2
     O3.geoVect = p3
@@ -358,6 +455,7 @@ def findOrbit(O1, O2, O3, factor=1):
 
     mu = c.G
 
+    # approximate velocity
     v_1, v_2, v_3 = r2V(O1, O2, O3, S1, S2, S3, mu)
 
     print("")
@@ -382,6 +480,7 @@ def findOrbit(O1, O2, O3, factor=1):
     a, e, i, o, f, w = orbitalElements(mu, S3, v_3)
     Orbit3 = KeplerOrbit(a, e, np.degrees(i), O=np.degrees(o), w=np.degrees(w))
 
+    # Store orbit into observation objects
     O1.orbit = Orbit1
     O2.orbit = Orbit2
     O3.orbit = Orbit3
@@ -389,6 +488,12 @@ def findOrbit(O1, O2, O3, factor=1):
     return O1, O2, O3, O1.orbit.e, O2.orbit.e, O3.orbit.e
 
 def plotOrbits(O1, O2, O3):
+    """ Plots orbits from observations along with mean orbit and other planets
+
+    Inputs:
+    O1, O2, O3 [Observation Objs] - Observation objects with orbits included (run findOrbit() first!)
+
+    """
 
     # If mass of the planets is 0:
     c = Constants()
@@ -510,6 +615,15 @@ def plotOrbits(O1, O2, O3):
     plt.show()
 
 def asteroidphasefunction(geo_vect, sun_vect):
+    """ Calculates the asteroid phase function
+
+    Inputs:
+    geo_vect [Vector3D] - Vector from earth to object
+    sun_vect [Vector3D] - Vector from sun to object
+
+    Outputs:
+    asteroid phase function [float]
+    """
 
     G = 0.15
     A1 = 3.33
@@ -524,6 +638,16 @@ def asteroidphasefunction(geo_vect, sun_vect):
     return 2.5*np.log10((1 - G)*phi_1 + G*phi_2)
 
 def calcMags(O1, O2, O3):
+
+    """ Calculates absolute magnitude of object from observations (run findOrbits() first!)
+
+    Inputs:
+    O1, O2, O3 [Observation Objs] - Observation objects with magnitudes and geo/sun vectors
+
+    Outputs:
+    mean_mag [float] - mean absolute magnitude of the three guesses
+    O1, O2, O3 [Observation Objs] - Observation Objects with their absolute magnitude included (call O.H)
+    """
 
     print("")
     print("Absolute Magnitudes")
@@ -542,10 +666,26 @@ def calcMags(O1, O2, O3):
     return mean_mag, O1, O2, O3
 
 def diameterCalc(mag, albedo):
+    """ Calculates diameter from formula given in notes
+
+    Inputs:
+    mag [float] - Absolute magnitude of object
+    albedo [float] - albedo of object
+
+    Outputs:
+    diameter [float] - Diameter in kilometers
+    """
 
     return 1329*10**(-mag/5)*albedo**(-0.5)
 
 def genRaDecPlot(O1, O2, O3, mag):
+    """ Generates RA and Dec plots FOR THIS PROJECT ONLY (change hardcoded points below if needed)
+
+    Inputs:
+    O1, O2, O3 [Observation Objs] - Observation Objs (run findOrbit() first!)
+    mag [float] - absolute magnitude of object
+    """
+
 
     mu = c.G
     jd = 2452465.5
@@ -568,7 +708,7 @@ def genRaDecPlot(O1, O2, O3, mag):
 
     O = O3
 
-    for jj in np.linspace(0, 30, 10):
+    for jj in np.linspace(0, 120, 121):
         
         jy = (jd + jj)
 
@@ -606,21 +746,20 @@ def genRaDecPlot(O1, O2, O3, mag):
         earth_dist_list.append(V.mag())
         sun_earth_list.append(R.mag())
 
-    # plt.subplot(2, 2, 1)
-    # plt.plot(jd_list, sun_dist_list, label="Sun-Object Distance")
-    # plt.plot(jd_list, earth_dist_list, label="Earth-Object Distance")
-    # plt.plot(jd_list, sun_earth_list, label="Sun-Earth Distance")
-    # plt.xlabel("JY [Years]")
-    # plt.ylabel("Distance [AU]")
+
     plt.subplot(2, 1, 1)
     plt.plot(jd_list, mag_list)
+    plt.xlabel("Julian Day [days]")
+    plt.ylabel("Apparent Magnitude")
     plt.scatter(np.array([2452465.5, 2452470.5, 2452480.5, 2452468.5, 2452474.5]), \
                 [24.658, 24.651, 24.636, 24.654, 24.646])
     plt.subplot(2, 1, 2)
     plt.plot(ra_list, dec_list)
+    plt.xlabel("Right Ascension [deg]")
+    plt.ylabel("Declination [deg]")
     plt.scatter([76.7504965149237393, 76.9265709928143906, 77.2495233320480423, 76.8571921038517445, 77.0607715091441463], \
                 [51.8102647002936152, 51.8507984607866774, 51.9434147424934523, 51.8341002906526711, 51.8860672841479200])
-    # plt.scatter([0], [0])
+
     plt.show()
 
 
@@ -629,7 +768,7 @@ if __name__ == "__main__":
     # RA, Dec, jd, Mag
     O1 = Observation(76.7504965149237393, 51.8102647002936152, 2452465.5,  24.658)
     O2 = Observation(76.9265709928143906, 51.8507984607866774, 2452470.5,  24.651)
-    O3 = Observation(77.2495233320480423, 51.9434147424934523, 2452480.5141,  24.636)
+    O3 = Observation(77.2495233320480423, 51.9434147424934523, 2452480.5141193,  24.636)
     O4 = Observation(76.8571921038517445, 51.8341002906526711, 2452468.5,  24.654)
     O5 = Observation(77.0607715091441463, 51.8860672841479200, 2452474.5,  24.646)
 
@@ -645,6 +784,8 @@ if __name__ == "__main__":
     print(O3)    
 
     O1, O2, O3, e1, e2, e3 = findOrbit(O1, O2, O3, factor=1)
+
+    ### Generate "fudge" factor plot
     # f_list = []
     # elist1 = []
     # elist2 = []
@@ -657,16 +798,17 @@ if __name__ == "__main__":
     #     elist2.append(e2)
     #     elist3.append(e3)
 
-    # plt.semilogy(f_list, elist1)
-    # plt.semilogy(f_list, elist2)
-    # plt.semilogy(f_list, elist3)
+    # plt.semilogy(f_list, elist1, label='Orbit 1')
+    # plt.semilogy(f_list, elist2, label='Orbit 2')
+    # plt.semilogy(f_list, elist3, label='Orbit 3')
     # plt.hlines(1, 0.99, 1.01)
     # plt.axis((0.99, 1.01, 0.1, 10))
     # plt.xlabel('"Fudge" Factor')
     # plt.ylabel("Eccentricity, e")
+    # plt.legend()
     # plt.show()
     # exit()
-    plotOrbits(O1.orbit, O2.orbit, O3.orbit)
+    # plotOrbits(O1.orbit, O2.orbit, O3.orbit)
     
     mag, _, _, _ = calcMags(O1, O2, O3)
 
