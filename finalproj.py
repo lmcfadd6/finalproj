@@ -111,22 +111,29 @@ def M2E(M, k_orbit):
     buf = 4
     N = 1000
 
+    # Guess E is anywhere
     E = np.linspace(0, 2*np.pi, N)
+    
+    # Find what M is for all E
     M_temp = E - k_orbit.e*np.sin(E)
 
     done = False
 
     while not done:
+
+        # Find which guess M is closest to the real M
         min_indx = np.argmin(np.abs(M_temp - M))
 
         closest_approach = np.abs((M_temp - M)[min_indx])
 
+        # If we are close enough, then leave
         if closest_approach < tol:
             done = True
             E = E[min_indx]
             break
 
-
+        # With the closest answer, search around that E with a buffer (buf)
+        # (Special cases for when E is close to 0 or 2 pi)
         if min_indx + buf >= N:
             E = np.linspace(E[min_indx - buf], E[N - 1], N)
         elif min_indx - buf < 0:
